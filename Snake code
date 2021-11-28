@@ -1,0 +1,436 @@
+#include <iostream>
+#include <conio.h>
+#include <windows.h>
+#include <dos.h>
+#include <time.h>
+#include <fstream>
+
+#define MAXSNAKESIZE 100
+#define MAXFRAMEX 119
+#define MAXFRAMEY 29
+
+using namespace std;
+
+HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+COORD CursorPosition;
+
+void gotoxy(int x, int y) {
+	CursorPosition.X = x;
+	CursorPosition.Y = y;
+	SetConsoleCursorPosition(console, CursorPosition);
+}
+void setcursor(bool visible, DWORD size) // set bool visible = 0 - invisible, bool visible = 1 - visible
+{
+	if (size == 0)
+	{
+		size = 20;	// default cursor size Changing to numbers from 1 to 20, decreases cursor width
+	}
+	CONSOLE_CURSOR_INFO lpCursor;
+	lpCursor.bVisible = visible;
+	lpCursor.dwSize = size;
+	SetConsoleCursorInfo(console, &lpCursor);
+}
+
+class Point {
+private:
+	int x;
+	int y;
+public:
+	
+	Point() {
+		x = y = 10;
+	}
+	Point(int x, int y) {
+		this->x = x;
+		this->y = y;
+	}
+	void SetPoint(int x, int y) {
+		this->x = x;
+		this->y = y;
+	}
+	int GetX() {
+		return x;
+	}
+	int GetY() {
+		return y;
+	}
+	void MoveUp() {
+		y--;
+		if (y < 0)
+			y = MAXFRAMEY;
+	}
+	void MoveDown() {
+		y++;
+		if (y > MAXFRAMEY)
+			y = 0;
+	}
+	void MoveLeft() {
+		x--;
+		if (x < 0)
+			x = MAXFRAMEX;
+	}
+	void MoveRight() {
+		x++;
+		if (x > MAXFRAMEX)
+			x = 0;
+	}
+	void Draw(char ch = '*') 
+	{
+		gotoxy(x, y);
+		SetConsoleTextAttribute(console, 250);
+		cout << ch;
+	}
+	void FDraw(char ch = '@') {
+		gotoxy(x, y);
+		SetConsoleTextAttribute(console, 250);
+		cout << ch;
+	}
+	void Erase() {
+		gotoxy(x, y);
+		cout << " ";
+	}
+	void CopyPos(Point* p) {
+		p->x = x;
+		p->y = y;
+	}
+	int IsEqual(Point* p) {
+		if (p->x == x && p->y == y)
+			return 1;
+		return 0;
+	}
+	void Debug() {
+		cout << "(" << x << "," << y << ") ";
+	}
+};
+
+class Snake {
+private:
+	Point* cell[MAXSNAKESIZE]; // array of points to represent snake
+	int size; // current size of snake
+	char dir; // current direction of snake
+	Point fruit;
+	int state; // bool representing state of snake i.e. living, dead
+	int blink; // fruit blink
+public:
+	void color(int color)
+	{
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
+	}
+	Snake() {
+		size = 1; // default size
+		cell[0] = new Point(20, 20); // 20,20 is default position
+		for (int i = 1; i < MAXSNAKESIZE; i++) {
+			cell[i] = NULL;
+		}
+		fruit.SetPoint(rand() % MAXFRAMEX, rand() % MAXFRAMEY);
+		state = 0;
+	}
+	void AddCell(int x, int y) {
+		cell[size++] = new Point(x, y);
+	}
+	void TurnUp() {
+		if (dir != 's')
+			dir = 'w'; // w is control key for turning upward
+	}
+	void TurnDown() {
+		if (dir != 'w')
+			dir = 's'; // w is control key for turning downward
+	}
+	void TurnLeft() {
+		if (dir != 'd')
+			dir = 'a'; // w is control key for turning left
+	}
+	void TurnRight() {
+		if (dir != 'a')
+			dir = 'd'; // w is control key for turning right
+	}
+	
+	void Options() 
+	{
+		int endwhile = 0;
+		int Set[] = { 7, 7, 7 };
+		char key = _getch();
+		int counter = 1;
+		Set[0] = 12;
+		while (endwhile != 1)
+		{
+			gotoxy(30, 5);
+			color(Set[0]);
+			cout << "1.Play";
+
+			gotoxy(30, 7);
+			color(Set[1]);
+			cout << "2.Color";
+
+			gotoxy(30, 9);
+			color(Set[2]);
+			cout << "3.Highscore";
+
+			key = _getch();
+
+			if (key == 72 && (counter >= 2 && counter <= 3))//^
+			{
+				counter--;
+			}
+			if (key == 80 && (counter >= 1 && counter <= 2))//\/
+			{
+				counter++;
+			}
+
+			if (counter == 1)
+			{
+				Set[0] = 12;
+				Set[1] = 7;
+				Set[2] = 7;
+			}
+			if (counter == 2)
+			{
+				Set[0] = 7;
+				Set[1] = 12;
+				Set[2] = 7;
+			}
+			if (counter == 3)
+			{
+				Set[0] = 7;
+				Set[1] = 7;
+				Set[2] = 12;
+			}
+			if (counter == 1 && key == '\r')
+			{
+				endwhile = 1;
+
+			}
+			if (counter == 2 && key == '\r')
+			{
+				endwhile = 1;
+				ChooseColor();
+			}
+			if (counter == 3 && key == '\r')
+			{
+				endwhile = 1;
+				Highscore();
+			}
+		}
+	}
+	void WelcomeScreen() 
+	{
+		SetConsoleTextAttribute(console, 15);
+		gotoxy(0, 1); 
+		cout << "\n     ---_ ......._-_--.												";
+		cout << "\n    (|\\ /      / /| \\  \\											";
+		cout << "\n    /  /     .'  -=-'   `.											";
+		cout << "\n   /  /    .'             )											";
+		cout << "\n _/  /   .'        _.)   /											";
+		cout << "\n/ o   o        _.-' /  .'	    									";
+		cout << "\n\\          _.-'    / .'*|											";
+		cout << "\n \\______.-'//    .'.' \\*|											";
+		cout << "\n  \\|  \\ | //   .'.' _ |*|											";
+		cout << "\n   `   \\|//  .'.'_ _ _|*|	   										";
+		cout << "\n    .  .// .'.' | _ _ \\*|											";
+		cout << "\n    \\`-|\\_/ /    \\ _ _ \\*\\										";
+		cout << "\n     `/'\\__/      \\ _ _ \\*\\										";
+		cout << "\n    /^|            \\ _ _ \\*\\										";
+		cout << "\n   '  `             \\ _ _ \\										";
+		cout << "\n                     \\_												";
+		
+	}
+
+	void Homescreen() 
+	{
+			int Set[] = { 7, 7, 7 };
+			gotoxy(30, 5);
+			color(Set[0]);
+			cout << "1.Play";
+			gotoxy(30, 7);
+			color(Set[1]);
+			cout << "2.Color";
+			gotoxy(30, 9);
+			color(Set[2]);
+			cout << "3.Highscore";
+			WelcomeScreen();
+			Options();
+			
+		
+	}
+
+	void Highscore() 
+	{
+		int endwhile = 0;
+		system("cls");
+		while (endwhile == 0)
+		{
+			char key = _getch();
+			cout << "click ESC to leave";
+			gotoxy(45, 10);
+			cout << "your highscore is: " << highscore;
+			if (key == 27)
+			{
+				endwhile = 1;
+				Play();
+			}
+		}
+		
+	}
+
+
+	void ChooseColor(int color = 249) 
+	{
+		system("cls");
+		
+		int endwhile = 0;
+		
+		
+		while (endwhile == 0)
+		{
+			cout << "click ESC to leave";
+			char key = _getch();
+			system("cls");
+			
+			if (color >= 241 && key == 77 && color < 254)
+			{
+				color+=1;
+				
+			}
+			if (color > 241 && key == 75 && color <= 254)
+			{
+				color-=1;
+			}
+			
+			gotoxy(30, 7);
+			SetConsoleTextAttribute(console, color);
+			cout << "--> " << " *** " << " <--";
+			if (key == 27)
+			{
+				endwhile = 1;
+				Play();
+			}
+			Sleep(100);
+			
+		}
+		
+			
+		
+	}
+	
+
+	
+
+	int score = 1;
+	
+	int highscore = 1;
+	char speed = 1;
+	void Play() 
+	{
+		system("cls");
+		if (state == 0)
+		{
+			if (score > highscore)
+			{
+				highscore = score;
+			}
+			WelcomeScreen();
+			Homescreen();
+			
+			state = 1;
+			size = 1;
+			score = 1;
+		}
+		cout << "Your score:  " << score;
+		
+
+		for (int i = size - 1; i > 0; i--) 
+		{
+			cell[i - 1]->CopyPos(cell[i]);
+		}
+
+		switch (dir) 
+		{
+		case 'w':
+			cell[0]->MoveUp();
+			break;
+		case 's':
+			cell[0]->MoveDown();
+			break;
+		case 'a':
+			cell[0]->MoveLeft();
+			break;
+		case 'd':
+			cell[0]->MoveRight();
+			break;
+		}
+
+		if (SelfCollision())
+			state = 0;
+
+
+
+		
+		if (fruit.GetX() == cell[0]->GetX() && fruit.GetY() == cell[0]->GetY()) 
+		{
+			AddCell(0, 0);
+			fruit.SetPoint(rand() % MAXFRAMEX, rand() % MAXFRAMEY);
+			score++;
+			speed += 0.1;
+		}
+
+		for (int i = 0; i < size; i++)
+			cell[i]->Draw();
+
+		SetConsoleTextAttribute(console, 242);
+		if (!blink)
+			SetConsoleTextAttribute(console, 250);
+			fruit.FDraw('@');
+		blink = !blink;
+		SetConsoleTextAttribute(console, 252);
+
+		Sleep(100/speed);
+	}
+	int SelfCollision() {
+		for (int i = 1; i < size; i++)
+			if (cell[0]->IsEqual(cell[i]))
+				return 1;
+		return 0;
+	}
+	void Debug() {
+		for (int i = 0; i < size; i++) {
+			cell[i]->Debug();
+		}
+	}
+};
+
+int main() {
+	setcursor(0, 0);
+	srand((unsigned)time(NULL));
+ 
+	Snake snake;
+	char op = 'l';
+	do {
+		if (_kbhit()) {
+			op = _getch();
+		}
+		switch (op) {
+		case 'w':
+		case 'W':
+			snake.TurnUp();
+			break;
+
+		case 's':
+		case 'S':
+			snake.TurnDown();
+			break;
+
+		case 'a':
+		case 'A':
+			snake.TurnLeft();
+			break;
+
+		case 'd':
+		case 'D':
+			snake.TurnRight();
+			break;
+		}
+		snake.Play();
+	} while (op != 'e');
+
+	return 0;
+}
